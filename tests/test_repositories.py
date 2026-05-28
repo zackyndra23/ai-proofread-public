@@ -162,7 +162,7 @@ def test_proofread_save_masking_mirror_bypasses_store_db_false(monkeypatch):
     """Regression guard untuk matrix row 3:
     STORE_DB=False + MASKING_RESULTS_FEATURE=True →
       - source masking_output ❌ skip (gated by STORE_DB via safe_insert)
-      - AIProofread_Masking_Results ✅ write (bypass via safe_insert_force)
+      - masking_results ✅ write (bypass via safe_insert_force)
 
     Test ini sengaja TIDAK pakai _isolate_proofread_repo_io — kita justru perlu
     safe_insert & safe_insert_force yang asli supaya logika gating-nya teruji.

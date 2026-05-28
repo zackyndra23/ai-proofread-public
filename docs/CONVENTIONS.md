@@ -46,7 +46,7 @@ for st, en, ... in candidates:
     last_end = en
 ```
 
-Always: **earliest start wins; ties broken by longest match; left-to-right non-overlap.** New patterns should respect this so longer matches like `"PT BUMA Internasional Grup Tbk."` aren't truncated by a shorter sibling pattern.
+Always: **earliest start wins; ties broken by longest match; left-to-right non-overlap.** New patterns should respect this so longer matches like `"PT Contoh Industri Indonesia Tbk."` aren't truncated by a shorter sibling pattern.
 
 ## 5. `+`-freeze trick (`services/phonefmt.py`)
 
@@ -99,12 +99,12 @@ For other modules (masking, htmlmask, ner, reformat) DTOs are plain dataclasses,
 ## 10. Rate limiting
 
 - `enforce_rps(name, rps, window_sec)` is registered in `before_request` of every blueprint (except `meta`).
-- Default: 20 RPS over a 60 s window — note the README's "1 second" example does not match the active `RATE_LIMIT_WINDOW=60` default.
+- Default: 20 requests over a 60 s window (`RATE_LIMIT_RPS` × `RATE_LIMIT_WINDOW_SEC`).
 - Use a unique `name` per blueprint (matches `bp.name`) so counters don't collide.
 
 ## 11. Default response format
 
-The proofread route returns JSON. The original product README describes a one-hit endpoint that returns HTML by default; that endpoint **does not exist** in current routes. Don't reintroduce it without designing the rendering / `Accept` negotiation explicitly.
+The proofread route returns JSON. If you want an HTML-by-default variant, design the `Accept`-header negotiation explicitly — don't piggyback on the existing route's defaults.
 
 ## 12. Indonesian-language code comments
 
@@ -121,7 +121,7 @@ Set in `app/core/config.py` from env:
 | `REJECT_SYMBOL_ONLY` | `REJECT_SYMBOL_ONLY` | off | Rejects payloads that are only symbols/numbers |
 | `LLM_SEMANTIC_VALIDATION` | `LLM_SEMANTIC_VALIDATION` | `1` | Runs the semantic guard; off skips it |
 
-Tweak intentionally; production typically wants these on (per `.env`, not `env.example`).
+Tweak intentionally; production typically wants these on.
 
 ## 14. Doc maintenance contract
 
@@ -136,4 +136,4 @@ When you change anything in this list of areas, update the relevant doc and bump
 | Hard invariants, regex constraints, naming conventions | this file |
 | Tenants / locales / NER mapping | `CLAUDE.md` "Tenants and locales" + [PROJECT_OVERVIEW.md §4](./PROJECT_OVERVIEW.md) |
 
-Always reconcile `README.md` in the same change if the change touches anything the README claims. When `README.md` and code disagree, **trust the code**.
+Reconcile `README.md` in the same change if the change touches anything the README claims.

@@ -6,12 +6,12 @@ from pymongo import MongoClient, ASCENDING, DESCENDING, ReturnDocument
 from pymongo.errors import OperationFailure
 
 # --- ENV ---
-MONGO_URI    = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017/AI_Proofread")
-DB_NAME      = os.getenv("MONGO_DB", "AI_Proofread")
+MONGO_URI    = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017/proofread")
+DB_NAME      = os.getenv("MONGO_DB", "proofread")
 DB_DISABLED  = os.getenv("DB_DISABLED", "0").lower() in ("1", "true", "yes")
 STORE_DB     = os.getenv("STORE_DB", "1").lower() in ("1", "true", "yes")
 FAIL_ON_DB   = os.getenv("FAIL_ON_DB", "0").lower() in ("1", "true", "yes")
-MASKING_RESULTS_DC = os.getenv("MASKING_RESULTS_DC", "AIProofread_Masking_Results")
+MASKING_RESULTS_DC = os.getenv("MASKING_RESULTS_DC", "masking_results")
 
 # parsed locally to mirror app/core/config.py:56 — hindari circular dep services/ → app/core/
 _MASKING_RESULTS_FEATURE_ENV = (os.getenv("MASKING_RESULTS_FEATURE") or "").strip().upper() == "ON"

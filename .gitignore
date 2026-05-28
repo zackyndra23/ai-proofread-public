@@ -1,20 +1,19 @@
-# # Models library
+# --- Secrets and local config (NEVER commit) ---
+.env
+.env.*
+!.env.example
+secrets/
+secrets.py
+config.json
+*.pem
+*-sa.json
+*service-account*.json
+*credentials*.json
+
+# --- Model weights and large artifacts ---
 ner_model/
 
-# IDEs dan editor
-.idea/
-.vscode/
-*.swp
-*.bak
-*.swo
-
-# Sistem operasi
-.DS_Store
-Thumbs.db
-ehthumbs.db
-.ntfs-3g/
-
-# Python
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -36,27 +35,42 @@ share/python-wheels/
 *.egg-info/
 .installed.egg-info/
 
-# Lingkungan virtual (pilih salah satu, sesuaikan dengan yang Anda gunakan)
+# --- Virtual environments ---
 .venv
 venv/
 env/
 /venv/
+ai_proofread_221025/
 
-# File data dan log
+# --- Test, coverage, lint caches ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# --- Data, logs, local DBs ---
 *.log
 *.sqlite3
 db.sqlite3
 /data/
 /logs/
 
-# File rahasia atau konfigurasi lokal
-# Ini sangat penting agar kredensial atau API key tidak ter-commit ke Git.
-.env
-config.json
-secrets.py
+# --- IDEs and editors ---
+.idea/
+.vscode/
+*.swp
+*.bak
+*.swo
 
-# google credential
-secrets/
+# --- OS ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+.ntfs-3g/
 
-# venv local updates
-ai_proofread_221025/
+# --- Claude Code / agent local state ---
+.claude/settings.local.json

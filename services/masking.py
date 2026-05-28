@@ -376,7 +376,7 @@ def mask_with_patterns(text: str, counters: Dict[str, int] | None = None) -> Tup
         (r"\b(?:Ibu|Bapak|Pak|Bu)\s+[A-Z][a-zA-Z]+\b", "PERSON"),
 
         # --- ORG: PT ... Tbk. (opsional 'PT.' dan '(Persero)') ---
-        # contoh: PT BUMA Internasional Grup Tbk.
+        # contoh: PT Contoh Industri Indonesia Tbk.
         (r"\bPT\.?\s+(?:[A-Z][A-Za-z0-9&\.\-/()]*\s+){1,8}(?:\(Persero\)\s+)?Tbk\.?", "ORG"),
 
         # IDs

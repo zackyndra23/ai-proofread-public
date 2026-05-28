@@ -12,7 +12,7 @@
 prefix = f"/{cfg.API_VERSION}" if cfg.API_PREFIX in ("", "/") else f"{cfg.API_PREFIX}/{cfg.API_VERSION}"
 ```
 
-With defaults (`API_PREFIX=""`, `API_VERSION="v1"`), all blueprint routes mount under **`/v1/...`**. The README's `BASE_PREFIX=/aitegrity-core/aiproofread` is **not** applied by Flask itself — treat it as a reverse-proxy / load-balancer convention.
+With defaults (`API_PREFIX=""`, `API_VERSION="v1"`), all blueprint routes mount under **`/v1/...`**. Set `API_PREFIX` if you want an additional path segment in front of the version.
 
 > Note: `app/modules/result_analyse/routes.py` defines `Blueprint("result_analyse", __name__, url_prefix="/v1/result-analyse")` AND is also registered with the global `prefix`. The blueprint-level `url_prefix` takes effect, so its routes are reachable at the paths listed below.
 
@@ -53,7 +53,7 @@ Every blueprint installs `enforce_rps(bp.name, cfg.RATE_LIMIT_RPS, cfg.RATE_LIMI
 | result_analyse | GET | `/v1/result-analyse/health` | QA module health (returns activation flag) |
 | result_analyse | POST | `/v1/result-analyse/append` | Ops-only manual append to Google Sheet |
 
-> The README mentions `/aitegrity-core/aiproofread/`, `/html_tag_freeze`, `/reverse_html_tag`, `/html_preview`, `/pii_datamasking`, `/llm-claude`, `/unmask`, `/reformating` as direct paths. **None of those exist in the active blueprints.** Either they were renamed or never landed. Treat the table above as authoritative.
+> The table above is authoritative — all active endpoints live under `/v1/...`.
 
 ---
 

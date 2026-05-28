@@ -2,7 +2,7 @@
 .git
 .gitignore
 .gitattributes
-.gitlab-ci.yml
+.github/
 
 # Python artifacts
 __pycache__/

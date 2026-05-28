@@ -3,9 +3,9 @@ version: "2.4"
 services:
   mongo:
     image: mongo:latest
-    container_name: pii_mongo
+    container_name: proofread_mongo
     environment:
-      - MONGO_INITDB_DATABASE=${MONGO_DB:-AI_Proofread}
+      - MONGO_INITDB_DATABASE=${MONGO_DB:-proofread}
     ports:
       - "27017:27017"
     volumes:
@@ -24,7 +24,7 @@ services:
 
   api:
     image: ${IMAGE_REPO}:${IMAGE_TAG}
-    container_name: aiproofread_endpoint
+    container_name: proofread_api
     env_file:
       - .env
     runtime: nvidia

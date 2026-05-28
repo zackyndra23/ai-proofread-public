@@ -29,7 +29,7 @@ class Config:
   NER_BASE_DIR         = p.normpath(p.join(BASE_DIR, "..", "ner_model"))
   TENANT2MODEL = {
     "indonesia": "indonlu_ner_grit",
-    "malaysia":  "malay_ner_finetuned_300725_10h50_set01",
+    "malaysia":  "malay_ner",
     "thailand":  "thai_nner",
   }
 

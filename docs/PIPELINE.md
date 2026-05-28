@@ -164,7 +164,7 @@ Module: `app/modules/masking/services.py::MaskingService.unmask`.
 | 6. Reverse HTML | `app/modules/htmlmask/services.py::HtmlMaskService.reverse` | `POST /v1/htmlmask/reverse` | `htmlmask/dto.py::ReverseRequest` | `htmlmask/repositories.py::HtmlRepository` | `html_reverse` |
 | One-hit pipeline | `app/modules/proofread/services.py::ProofreadService.run` | `POST /v1/proofread` | `proofread/dto.py::ProofreadRequest` | `proofread/repositories.py::ProofreadRepo` | `summary_output` (consolidated) |
 
-> Note: the README mentions one-hit / preview endpoints (`/aitegrity-core/aiproofread/`, `/html_preview`, `/pii_datamasking`, `/llm-claude`, `/unmask`, `/reformating`) that **do not exist** in the active routes. See [ENDPOINTS.md](./ENDPOINTS.md) for the real surface.
+> All endpoints live under the `/v1/...` prefix. See [ENDPOINTS.md](./ENDPOINTS.md) for the full surface.
 
 ---
 
@@ -173,7 +173,7 @@ Module: `app/modules/masking/services.py::MaskingService.unmask`.
 A non-load-bearing side-write that copies a 9-field whitelist of every `masking_output` document produced by the `/v1/proofread` flow to a separate Mongo collection. Intended as a curated dataset for future masking-model improvement.
 
 - **Toggle:** `Config.MASKING_RESULTS_FEATURE` — strict parse, only literal `ON` (case-insensitive) enables. Default OFF (fail-safe).
-- **Destination collection:** `MASKING_RESULTS_DC` env var (default `AIProofread_Masking_Results`). Bound and indexed in `services/db.py::init_db()` regardless of toggle.
+- **Destination collection:** `MASKING_RESULTS_DC` env var (default `masking_results`). Bound and indexed in `services/db.py::init_db()` regardless of toggle.
 - **Whitelist:** `_id, report_id, toc_type, tenant, locale, message_01, layers, created_at, created_at2`. Defined in `app/modules/proofread/repositories.py::_MASKING_RESULTS_FIELDS`. Field non-whitelist (`body`, `order`) is **not** copied.
 - **`_id` reuse:** the source document's `_id` is pre-generated as `bson.ObjectId()` in `ProofreadRepo.save_masking` and copied into the mirror — gives a 1:1 trace.
 - **Timestamps:** `created_at`/`created_at2` are copied from source (snapshot consistency).

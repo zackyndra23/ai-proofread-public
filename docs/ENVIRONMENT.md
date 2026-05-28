@@ -15,7 +15,6 @@
 | `FLASK_DEBUG` | `1` if unset (in `app.py` startup) | `0` / `1`. |
 | `PORT` | `5000` (Flask), `2302` (compose convention) | Set in `wsgi.py` / `app.py`. |
 | `HOST` | `0.0.0.0` | Set in `app.py` startup. |
-| `BASE_PREFIX` | (unused by Flask) | Reverse-proxy convention only. The Flask app uses `API_PREFIX + API_VERSION`. |
 
 ## 2. Versioning
 
@@ -32,7 +31,7 @@
 
 | Variable | Default (code) | Notes |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | (none) | Pattern `^sk-ant-[A-Za-z0-9_-]{20,}$` (per env.example). |
+| `ANTHROPIC_API_KEY` | (none) | Pattern `^sk-ant-[A-Za-z0-9_-]{20,}$` (per `.env.example`). |
 | `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Model used by `services/llm.py`. Use the alias exactly — never append a date suffix (the alias is the complete ID). |
 | `ANTHROPIC_MAX_TOKENS` | (env-driven; no code default visible in `Config`) | Max output tokens per Anthropic call. |
 | `MAX_INPUT_TOKEN` | `0` (= unlimited) | Read by `Config.MAX_INPUT_TOKEN`. Over-limit input → 400 `input_too_large`. |
@@ -54,8 +53,8 @@ Truthy values: `1`, `true`, `yes`. Anything else → off.
 | Variable | Default (code) | Notes |
 |---|---|---|
 | `MONGO_URI` | (none) | Full URI incl. credentials and `authSource=admin`. |
-| `MONGO_DB` | (none) | E.g. `AI_Proofread`. |
-| `MASKING_RESULTS_DC` | `AIProofread_Masking_Results` | Destination collection for the 9-field whitelist mirror (see §13a). |
+| `MONGO_DB` | `proofread` | Database name. |
+| `MASKING_RESULTS_DC` | `masking_results` | Destination collection for the 9-field whitelist mirror (see §13a). |
 
 Initialised by `services/db.py::init_db()` at app startup.
 
@@ -64,7 +63,7 @@ Initialised by `services/db.py::init_db()` at app startup.
 | Variable | `Config` default | Notes |
 |---|---|---|
 | `RATE_LIMIT_RPS` | `20` | Max requests per window. |
-| `RATE_LIMIT_WINDOW_SEC` | `60` | Window length in seconds. **Note:** `Config.RATE_LIMIT_WINDOW` reads this. The README's example `RATE_LIMIT_WINDOW_SEC=1` does not match the code default. |
+| `RATE_LIMIT_WINDOW_SEC` | `60` | Window length in seconds. `Config.RATE_LIMIT_WINDOW` reads this. |
 
 ## 7. NER and prompts
 
@@ -84,7 +83,7 @@ Initialised by `services/db.py::init_db()` at app startup.
 | Tenant | NER subdir |
 |---|---|
 | `indonesia` | `indonlu_ner_grit` |
-| `malaysia`  | `malay_ner_finetuned_300725_10h50_set01` |
+| `malaysia`  | `malay_ner` |
 | `thailand`  | `thai_nner` |
 
 ## 8. GPU
@@ -97,7 +96,7 @@ Initialised by `services/db.py::init_db()` at app startup.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `RESULT_ANALYZE` | `ACTIVATE` (per `env.example`) | `ACTIVATE` enables the after-final hook in `ProofreadRepo`; `INACTIVE` disables. |
+| `RESULT_ANALYZE` | `INACTIVE` (per `.env.example`) | `ACTIVATE` enables the after-final hook in `ProofreadRepo`; `INACTIVE` disables. |
 | `GOOGLE_SHEET_ID` | (none) | Target sheet, ~44-char base62. |
 | `RESULT_ANALYZE_SHEET_TAB` | (none) | Tab name within the sheet. |
 | `GOOGLE_SA_JSON_PATH` | (none) | Path inside container to the service account JSON. |
@@ -107,9 +106,9 @@ Initialised by `services/db.py::init_db()` at app startup.
 
 | Variable | `Config` default | Notes |
 |---|---|---|
-| `LANGUAGE_MIN_CHARS` | (env-driven; README example `80`) | Below this → unreliable detection. |
-| `LANGUAGE_CONFIDENCE_MIN` | (env-driven; README `0.85`) | Auto-accept threshold. |
-| `LLM_LANG_VALIDATION` | (env-driven) | `1` enables Claude fallback. |
+| `LANGUAGE_MIN_CHARS` | `80` (see `.env.example`) | Below this → unreliable detection. |
+| `LANGUAGE_CONFIDENCE_MIN` | `0.85` (see `.env.example`) | Auto-accept threshold. |
+| `LLM_LANG_VALIDATION` | `1` | Toggles Claude fallback on low confidence. |
 
 ## 11. Semantic-text guard (not in README)
 
@@ -144,7 +143,7 @@ Optional dataset mirror for future masking-model training. When enabled, the `/v
 | Variable | `Config` field | Default | Effect |
 |---|---|---|---|
 | `MASKING_RESULTS_FEATURE` | `MASKING_RESULTS_FEATURE` | OFF | **Strict** parse — only literal `ON` (case-insensitive) enables. Any other value, typo, empty, or unset → OFF. |
-| `MASKING_RESULTS_DC` | (read in `services/db.py`) | `AIProofread_Masking_Results` | Mongo collection name for the mirror. |
+| `MASKING_RESULTS_DC` | (read in `services/db.py`) | `masking_results` | Mongo collection name for the mirror. |
 
 Whitelist (hardcoded in `app/modules/proofread/repositories.py::_MASKING_RESULTS_FIELDS`):
 
@@ -161,17 +160,6 @@ Behaviour notes:
 
 ## 14. Files and where they live
 
-- **Template:** `env.example` (committed). Not auto-loaded.
+- **Template:** `.env.example` (committed). Not auto-loaded.
 - **Active values:** `.env` (gitignored). Auto-loaded at `app.py` import via `load_dotenv()`.
-- **Secrets dir:** `secrets/` (gitignored). Holds Google service account JSON.
-
-## 15. Discrepancies with README §"Environment (.env)"
-
-| README claim | Code reality |
-|---|---|
-| `RATE_LIMIT_WINDOW_SEC=1` example | Code default is `60`. |
-| Locale list `en, id, th, my` | DTO accepts `en, id, ms`. README also conflates `my` (DTO) vs `ms` (Lingua); active DTO uses `ms`. |
-| Endpoints under `/aitegrity-core/aiproofread/...` | Active app mounts under `/{API_VERSION}` only. `BASE_PREFIX` is not applied by Flask. |
-| Mentions of `/html_tag_freeze`, `/reverse_html_tag`, `/html_preview`, `/pii_datamasking`, `/llm-claude`, `/unmask`, `/reformating` | Not present in routes. Real paths in [ENDPOINTS.md](./ENDPOINTS.md). |
-
-When the README and the code conflict in a way users care about, fix the README in the same change.
+- **Secrets dir:** `secrets/` (gitignored). Holds Google service-account JSON when QA-push to Sheets is enabled.
