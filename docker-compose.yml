@@ -1,0 +1,49 @@
+version: "2.4"
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: pii_mongo
+    environment:
+      - MONGO_INITDB_DATABASE=${MONGO_DB:-AI_Proofread}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.runCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  api:
+    image: ${IMAGE_REPO}:${IMAGE_TAG}
+    container_name: aiproofread_endpoint
+    env_file:
+      - .env
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    ports:
+      - "2302:2302"
+    volumes:
+      - ${HOST_NER_MODEL_DIR:-./ner_model}:${NER_MODEL_DIR:-/ner_model}:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  mongo-data:

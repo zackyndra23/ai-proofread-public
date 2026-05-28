@@ -1,0 +1,39 @@
+# Core Web Framework
+Flask
+python-dotenv
+
+# MongoDB
+pymongo
+
+# Phone Number Handling
+phonenumbers
+
+# LLM API (Anthropic)
+anthropic
+
+# NER Models (HuggingFace Transformers)
+transformers==4.43.4
+
+# Optional: untuk parsing HTML/Markdown (kalau nanti mau ditambah)
+beautifulsoup4
+markdown-it-py
+
+# Regex library
+piiregex
+
+# jalankan machine docker tanpa compose
+gunicorn
+
+# atur limir rps
+flask-limiter
+
+# swagger
+flasgger 
+PyYAML
+
+gspread
+google-auth
+
+bleach
+tiktoken
+lingua-language-detector

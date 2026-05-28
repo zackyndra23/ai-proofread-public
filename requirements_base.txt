@@ -1,0 +1,32 @@
+# Core Web Framework
+Flask
+python-dotenv
+
+# MongoDB
+pymongo
+
+# Phone Number Handling
+phonenumbers
+
+# LLM API (Anthropic)
+anthropic
+
+# Optional: HTML/Markdown parsing
+beautifulsoup4
+markdown-it-py
+
+# Regex library
+piiregex
+
+# Rate limit
+flask-limiter
+
+# Swagger
+flasgger
+PyYAML
+
+# WSGI server
+gunicorn
+
+gspread
+google-auth

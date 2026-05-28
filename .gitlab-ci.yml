@@ -1,0 +1,327 @@
+workflow:
+  rules:
+    # Optional: MR pipeline for fast feedback (no build/release/deploy)
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: always
+
+    # Tag pipelines (rc -> staging, release -> production)
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/'
+      when: always
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+      when: always
+
+    # Default: do not run
+    # Run on default branch pushes
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: always
+    - when: never
+
+stages:
+  - test
+  - sonar
+  - build
+  - changelog
+  - release
+  - deploy
+
+variables:
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: "unix:///var/run/docker.sock"
+
+  # The image tag you build and push (release or rc tag).
+  IMAGE_TAG: "$CI_COMMIT_TAG"
+
+  # Used by app build (optional)
+  APP_VERSION: "$CI_COMMIT_TAG"
+
+  # Common docker image
+  DOCKER_IMAGE: "docker:27.3.1"
+  DIND_IMAGE: "docker:27.3.1-dind"
+  
+  REGISTRY_INTERNAL_IP: "10.30.40.147"
+
+default:
+  interruptible: true
+
+# -----------------------
+# TEST (runs on MR + tags)
+# -----------------------
+test:
+  stage: test
+  image: python:3.10
+  tags: [10.30.40.155, Docker, Ubuntu]
+  script:
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements_base.txt -r requirements_test.txt
+    - python -m pytest
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+)%/'
+  artifacts:
+    when: always
+    paths: [coverage.xml]
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_TAG'
+
+# -----------------------
+# SONAR (runs on MR + tags)
+# -----------------------
+sonar:
+  stage: sonar
+  image:
+    name: sonarsource/sonar-scanner-cli:11
+    entrypoint: [""]
+  needs:
+    - job: test
+      artifacts: true
+  tags: [10.30.40.155, Docker, Ubuntu, Alpine]
+  cache:
+    key: "sonar-cache-$CI_COMMIT_REF_SLUG"
+    policy: pull-push
+    paths:
+      - "${SONAR_USER_HOME}/cache"
+      - sonar-scanner/
+  before_script:
+    - set -e
+    - export SONAR_HOST_DOMAIN="${SONAR_HOST_DOMAIN:-$(echo "$SONAR_HOST_URL" | sed -E 's#^https?://([^/:]+).*#\1#')}"
+    - 'echo "Sonar host domain: $SONAR_HOST_DOMAIN"'
+    - 'if openssl s_client -showcerts -connect "$SONAR_HOST_DOMAIN:443" </dev/null | sed -ne "/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p" > sonarqube.crt && [ -s sonarqube.crt ]; then mkdir -p "$CI_PROJECT_DIR/certs"; keytool -import -alias sonar -storepass changeit -noprompt -keystore "$CI_PROJECT_DIR/certs/cacerts" -file sonarqube.crt; export SONAR_SCANNER_OPTS="-Djavax.net.ssl.trustStore=$CI_PROJECT_DIR/certs/cacerts -Djavax.net.ssl.trustStorePassword=changeit"; else echo "No custom cert injected; using system CA."; fi'
+  script:
+    - sonar-scanner -Dsonar.login="$SONAR_TOKEN" -Dsonar.host.url="$SONAR_HOST_URL"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_TAG'
+
+# -----------------------
+# BUILD (tags only)
+# -----------------------
+.build_template: &build_template
+  stage: build
+  image: $DOCKER_IMAGE
+  tags: [Alpine, Docker, Ubuntu, 10.30.40.155]
+  needs: ["sonar"]
+  before_script:
+    - echo "${REGISTRY_INTERNAL_IP} registry.gitlab.integrity-asia.com" >> /etc/hosts
+    - getent hosts registry.gitlab.integrity-asia.com
+    - unset DOCKER_TLS_VERIFY DOCKER_CERT_PATH
+    - export DOCKER_TLS_CERTDIR=""
+    - apk add --no-cache ca-certificates bind-tools
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+
+    # Debug DNS resolution inside CI
+    - echo "DNS check:"
+    - nslookup "$CI_REGISTRY" || true
+  script:
+    - 'echo "Building image version: $IMAGE_TAG (APP_VERSION=$APP_VERSION)"'
+
+    # Recreate builder supaya tidak pakai builder lama yang masih resolve ke IP public
+    - docker buildx rm ci-builder || true
+    - docker buildx create --use --name ci-builder --driver docker-container
+    - docker buildx inspect --bootstrap
+
+    # Inject hosts override ke container BuildKit
+    - |
+      BUILDKIT_CONTAINER="$(docker ps --filter name=buildx_buildkit_ci-builder --format '{{.Names}}' | head -n1)"
+      echo "BuildKit container: $BUILDKIT_CONTAINER"
+
+      if [ -z "$BUILDKIT_CONTAINER" ]; then
+        echo "ERROR: BuildKit container not found"
+        docker ps
+        exit 1
+      fi
+
+      docker exec "$BUILDKIT_CONTAINER" sh -c "echo '${REGISTRY_INTERNAL_IP} registry.gitlab.integrity-asia.com' >> /etc/hosts"
+
+      echo "BuildKit /etc/hosts:"
+      docker exec "$BUILDKIT_CONTAINER" cat /etc/hosts || true
+
+      echo "BuildKit DNS check:"
+      docker exec "$BUILDKIT_CONTAINER" nslookup registry.gitlab.integrity-asia.com || true
+
+    - |
+      docker buildx build \
+        --add-host "registry.gitlab.integrity-asia.com:$REGISTRY_INTERNAL_IP" \
+        --cache-from type=registry,ref=$CI_REGISTRY_IMAGE:buildcache \
+        --cache-to type=registry,ref=$CI_REGISTRY_IMAGE:buildcache,mode=max \
+        --push \
+        -t "$CI_REGISTRY_IMAGE:$IMAGE_TAG" \
+        .
+
+build-staging:
+  <<: *build_template
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/'
+
+build-production:
+  <<: *build_template
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+
+# -----------------------
+# CHANGELOG (tags only)
+# -----------------------
+changelog:
+  stage: changelog
+  image: alpine:latest
+  tags: [Alpine, Docker, Ubuntu, 10.30.40.155]
+  needs:
+    - job: build-staging
+      optional: true
+    - job: build-production
+      optional: true
+  before_script:
+    - apk add --no-cache git
+    - git fetch --unshallow || true
+    - git fetch --tags || true
+  script:
+    - |
+      PREV_TAG=$(git describe --tags --abbrev=0 "$CI_COMMIT_TAG^" 2>/dev/null || echo "")
+      echo "Current tag : $CI_COMMIT_TAG"
+      echo "Previous tag: $PREV_TAG"
+
+      if [ -n "$PREV_TAG" ]; then
+        RANGE="$PREV_TAG..$CI_COMMIT_TAG"
+      else
+        RANGE="$CI_COMMIT_TAG"
+      fi
+
+      git log --no-merges --date=short --pretty=format:'%ad|%h|%H|%s' $RANGE > commits.log
+
+      echo "# Changelog for $CI_COMMIT_TAG" > CHANGELOG.md
+      echo "" >> CHANGELOG.md
+
+      generate_section() {
+        local title="$1"; local prefix="$2"
+        local tmpfile="section_${prefix}.md"
+        awk -F'|' -v p="$prefix" -v url="$CI_PROJECT_URL" '
+          {
+            subj=$4; low=tolower(subj)
+            if (index(low, p) == 1) {
+              sub("^[^:]*: *", "", subj)
+              printf "- %s [%s](%s/-/commit/%s)\n", subj, $2, url, $3 >> "'"$tmpfile"'"
+            }
+          }
+        ' commits.log
+
+        if [ -s "$tmpfile" ]; then
+          echo "## $title" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          cat "$tmpfile" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+        fi
+        rm -f "$tmpfile"
+      }
+
+      generate_section "Features" "feat:"
+      generate_section "Fixes" "fix:"
+      generate_section "Chores" "chore:"
+      generate_section "Documentation" "docs:"
+      generate_section "Refactors" "refactor:"
+      generate_section "Tests" "test:"
+
+      rm -f commits.log
+  artifacts:
+    paths: [CHANGELOG.md]
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_TAG'
+
+# -----------------------
+# RELEASE (tags only)
+# -----------------------
+gitlab_release:
+  stage: release
+  image: alpine:latest
+  tags: [Alpine, Docker, Ubuntu, 10.30.40.155]
+  needs: ["changelog"]
+  script:
+    - apk add --no-cache curl jq
+    - RELEASE_DESC="$(cat CHANGELOG.md)"
+    - |
+      if echo "$CI_COMMIT_TAG" | grep -Eq -- '-rc\.[0-9]+$'; then
+        ENV_NAME="Staging"
+      else
+        ENV_NAME="Production"
+      fi
+
+      RELEASE_NAME="$CI_COMMIT_TAG ($ENV_NAME)"
+      echo "Creating GitLab Release: $RELEASE_NAME"
+
+      HTTP_CODE=$(curl --silent --output response.json --write-out "%{http_code}" \
+        --request POST \
+        --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "$(jq -n \
+          --arg tag "$CI_COMMIT_TAG" \
+          --arg name "$RELEASE_NAME" \
+          --arg desc "$RELEASE_DESC" \
+          '{name: $name, tag_name: $tag, description: $desc}')" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases")
+
+      echo "GitLab API status: $HTTP_CODE"
+      cat response.json || true
+
+      if [ "$HTTP_CODE" = "201" ]; then
+        echo "Release created successfully."
+      elif [ "$HTTP_CODE" = "409" ]; then
+        echo "Release already exists. Skipping."
+      else
+        echo "Failed to create release (HTTP $HTTP_CODE)."
+        exit 1
+      fi
+  rules:
+    - if: '$CI_COMMIT_TAG'
+
+# -----------------------
+# DEPLOY (tags only; manual gate)
+# -----------------------
+.deploy_template: &deploy_template
+  stage: deploy
+  tags: [10.30.40.155, Shell, Ubuntu]
+  needs: ["gitlab_release"]
+  before_script:
+    - eval "$(ssh-agent -s)"
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan -p "${SSH_PORT:-22}" "$SSH_HOST" >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - |
+      echo "Deploying $CI_COMMIT_TAG to $ENV_NAME"
+      ssh -p "${SSH_PORT:-22}" "$SSH_USER@$SSH_HOST" "
+        set -euo pipefail
+        docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+        cd $DEPLOY_DIR
+        export IMAGE_REPO=$CI_REGISTRY_IMAGE IMAGE_TAG=${IMAGE_TAG:-$CI_COMMIT_TAG}
+        docker compose pull $SERVICE_NAME
+        docker compose up -d --no-deps $SERVICE_NAME
+        docker image prune -f
+      "
+  environment:
+    name: $ENV_NAME
+    url: $ENV_URL
+
+deploy-staging:
+  <<: *deploy_template
+  variables:
+    ENV_NAME: Staging
+    ENV_URL: https://ai-services.integrity-asia.com
+    SERVICE_NAME: api
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/'
+  when: manual
+
+deploy-production:
+  <<: *deploy_template
+  variables:
+    ENV_NAME: Production
+    ENV_URL: https://ai-services.integrity-asia.com
+    SERVICE_NAME: api
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+  when: manual

@@ -1,0 +1,11 @@
+[run]
+source = app,services
+omit =
+    services/phonefmt.py
+    services/ner.py
+    services/llm.py
+    services/gsheets_client.py
+    services/phone_world_cc.py
+    app/modules/ner/*
+    app/modules/proofread/*
+    app/modules/result_analyse/*

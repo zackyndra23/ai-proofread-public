@@ -1,0 +1,42 @@
+# VCS & tooling
+.git
+.gitignore
+.gitattributes
+.gitlab-ci.yml
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+*.coverage
+.pytest_cache/
+.mypy_cache/
+
+# venv dan build
+venv/
+.env
+.env.*
+dist/
+build/
+
+# Node (kalau ada frontend)
+node_modules/
+
+# Data / model lokal (jangan kirim ke image)
+*.bin
+*.pt
+*.onnx
+*.model
+*.vec
+*.pickle
+*.pkl
+models/
+data/
+
+# google credential
+secrets/
+
+# Prompt/templates kalau TIDAK dibake ke image (karena kita mount)
+ner_model/
