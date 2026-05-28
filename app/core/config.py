@@ -1,3 +1,4 @@
+# config
 import os, os.path as p
 
 class Config:
